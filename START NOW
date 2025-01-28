@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terminal Navigation</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .terminal {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        .terminal-header, .terminal-footer {
+            padding: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+        }
+        .terminal-header {
+            background-color: #333;
+            color: #fff;
+        }
+        .terminal-footer {
+            background-color: #111;
+            color: #00ff00;
+        }
+        .output-container {
+            flex: 1;
+            background-color: #000;
+            color: #00ff00;
+            padding: 10px;
+            border: 1px solid #00ff00;
+            overflow-y: auto;
+        }
+        .input-line {
+            display: flex;
+            align-items: center;
+        }
+        .prompt {
+            margin-right: 10px;
+        }
+        .input {
+            flex: 1;
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+            color: #00ff00;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="terminal-header" id="header">
+            <span id="user-role">Guest</span> - <span id="entity-name">Default Financial Entity</span>
+        </div>
+        <div class="output-container" id="output-container">
+            <div class="output">Welcome to the Terminal Navigation System.</div>
+            <div class="output">Type <strong>help</strong> to see available commands or use function keys for quick actions.</div>
+        </div>
+        <div class="input-line">
+            <span class="prompt">></span>
+            <input type="text" class="input" id="terminal-input" autofocus>
+        </div>
+        <div class="terminal-footer">
+            Commands: F1-help | F2-addclient | F3-pof | F4-validate | F5-changebank | F6-clear | F12-exit
+        </div>
+    </div>
+
+    <script>
+        const terminalInput = document.getElementById('terminal-input');
+        const outputContainer = document.getElementById('output-container');
+        const userRole = document.getElementById('user-role');
+        const entityName = document.getElementById('entity-name');
+        const clientInfoKey = 'clientInfo';
+        const clientInfo = JSON.parse(localStorage.getItem(clientInfoKey)) || {};
+
+        let authenticated = false;
+
+        const user = {
+            role: 'Admin',
+            entity: 'Central Bank',
+        };
+
+        function configureTerminal(user) {
+            entityName.textContent = user.entity;
+            userRole.textContent = user.role;
+        }
+
+        configureTerminal(user);
+
+        const commands = {
+            help: () => {
+                return [
+                    'Available Commands:',
+                    '1. addclient - Add new client information',
+                    '2. pof - Display Proof of Funds',
+                    '3. validate - Validate Proof of Funds',
+                    '4. changebank - Switch Financial Entity',
+                    '5. clear - Clear the terminal',
+                    '6. exit - Exit the terminal'
+                ];
+            },
+            addclient: (args) => {
+                const [name, address, signer, currency, amount] = args.join(' ').split(',');
+                if (!name || !address || !signer || !/^[A-Z]{3}$/.test(currency) || isNaN(amount) || amount <= 0) {
+                    return ['Invalid input format. Use: Name,Address,Signer,Currency,Amount'];
+                }
+                clientInfo.accountHolder = name;
+                clientInfo.address = address;
+                clientInfo.accountSigner = signer;
+                clientInfo.currency = currency;
+                clientInfo.amount = parseFloat(amount).toFixed(2);
+                localStorage.setItem(clientInfoKey, JSON.stringify(clientInfo));
+                return ['Client information added successfully.'];
+            },
+            pof: () => {
+                if (!clientInfo.accountHolder) return ['No client information available. Use "addclient" first.'];
+                const transactionId = `TX-${Date.now()}`;
+                return [
+                    `Account Holder: ${clientInfo.accountHolder}`,
+                    `Address: ${clientInfo.address}`,
+                    `Account Signer: ${clientInfo.accountSigner}`,
+                    `Currency: ${clientInfo.currency}`,
+                    `Amount Balance: $${clientInfo.amount}`,
+                    `Transaction ID: ${transactionId}`
+                ];
+            },
+            validate: (args) => {
+                const code = args[0];
+                if (!code) return ['Enter a transaction code to validate.'];
+                const isValid = /^TX-\d+$/.test(code);
+                return isValid ? ['Validation successful!'] : ['Invalid transaction code.'];
+            },
+            changebank: () => {
+                if (!authenticated) {
+                    return ['Access denied. Please authenticate first. Use the "authenticate" command.'];
+                }
+                return ['Switching financial entity...'];
+            },
+            clear: () => {
+                if (confirm('Are you sure you want to clear the terminal?')) {
+                    outputContainer.innerHTML = '';
+                    return [];
+                }
+                return ['Clear command canceled.'];
+            },
+            exit: () => {
+                if (confirm('Are you sure you want to exit?')) {
+                    return ['Exiting terminal. Goodbye!'];
+                }
+                return ['Exit command canceled.'];
+            },
+            authenticate: () => {
+                const password = prompt('Enter your password:');
+                authenticated = password === 'securepassword';
+                return authenticated ? ['Authenticated successfully.'] : ['Authentication failed.'];
+            }
+        };
+
+        function executeCommand(input) {
+            const [command, ...args] = input.split(' ');
+            const cmd = commands[command.toLowerCase()];
+            if (cmd) {
+                return cmd(args);
+            }
+            return [`Unknown command: ${command}`, 'Type "help" for a list of valid commands.'];
+        }
+
+        terminalInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const input = terminalInput.value.trim();
+                const outputLines = executeCommand(input);
+                outputLines.forEach(line => {
+                    const outputDiv = document.createElement('div');
+                    outputDiv.className = 'output';
+                    outputDiv.textContent = line;
+                    outputContainer.appendChild(outputDiv);
+                });
+                terminalInput.value = '';
+                outputContainer.scrollTop = outputContainer.scrollHeight;
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            const keyMap = {
+                F1: 'help',
+                F2: 'addclient',
+                F3: 'pof',
+                F4: 'validate',
+                F5: 'changebank',
+                F6: 'clear',
+                F12: 'exit',
+                '1': 'help',
+                '2': 'addclient',
+                '3': 'pof',
+                '4': 'validate',
+                '5': 'changebank',
+                '6': 'clear',
+                '12': 'exit'
+            };
+            if (keyMap[e.key]) {
+                e.preventDefault();
+                const outputDiv = document.createElement('div');
+                outputDiv.className = 'output';
+                outputDiv.textContent = `Executing: ${keyMap[e.key]}`;
+                outputContainer.appendChild(outputDiv);
+                const outputLines = executeCommand(keyMap[e.key]);
+                outputLines.forEach(line => {
+                    const outputDiv = document.createElement('div');
+                    outputDiv.className = 'output';
+                    outputDiv.textContent = line;
+                    outputContainer.appendChild(outputDiv);
+                });
+                outputContainer.scrollTop = outputContainer.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>
